@@ -1,114 +1,138 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from model import fire_smoke_classifier
-import os
 
-def train_model():
-    batch_size = 32
-    epochs = 5
-    learning_rate = 0.001
+def train():
+    EPOCHS = 10
+    BATCH_SIZE = 32
+    LR = 1e-4
+    PATIENCE  = 5       
+    SAVE_PATH = "models/best_model.pth"
 
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    print("Using device:", device)
+    print(f"Device: {device}")
 
     train_transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
+        transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(10),
-
-        transforms.ColorJitter(
-            brightness=0.3,
-            contrast=0.3,
-            saturation=0.2,
-            hue=0.05
-        ),
-
-        transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),  # 🔥 smoke-ի համար շատ կարևոր
-
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2),
         transforms.ToTensor(),
- 
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.485, 0.456, 0.406],
+                             [0.229, 0.224, 0.225]),
+        transforms.RandomErasing(p=0.2),
     ])
 
     val_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.485, 0.456, 0.406],
+                             [0.229, 0.224, 0.225]),
     ])
 
-    train_dataset = datasets.ImageFolder('classifier_data/train', transform=train_transform)
-    val_dataset = datasets.ImageFolder('classifier_data/valid', transform=val_transform)
+    train_ds = datasets.ImageFolder("classifier_data/train",
+                                    transform=train_transform)
+    val_ds   = datasets.ImageFolder("classifier_data/valid",
+                                    transform=val_transform)
 
-    print(f"Train samples: {len(train_dataset)}")
-    print(f"Val samples: {len(val_dataset)}")
-    print(train_dataset.class_to_idx)
+    print(f"Classes: {train_ds.classes}")
+    print(f"Train: {len(train_ds)} | Val: {len(val_ds)}")
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE,
+                              shuffle=True, num_workers=0)
+    val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE,
+                              shuffle=False, num_workers=0)
 
-    model = fire_smoke_classifier(num_classes=3)
-    weights_path = "models/fire_smoke_classifier.pth"
-    if os.path.exists(weights_path):
-        print(f"Loading existing weights from {weights_path}...")
-        model.load_state_dict(torch.load(weights_path, map_location=device))
-    model.to(device)
+    model = fire_smoke_classifier(num_classes=3).to(device)
+
+    if os.path.exists(SAVE_PATH):
+        model.load_state_dict(torch.load(SAVE_PATH, map_location=device))
+        print("Նախկին model բեռնված։ Շարունակում ենք...")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(filter(lambda par: par.requires_grad, model.parameters()), lr=learning_rate, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, factor=0.5)
+    optimizer = optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=LR
+    )
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=3
+    )
 
-    for epoch in range(epochs):
+    # ── Training Loop ────────────────────────────────────────────────
+    best_val_loss   = float('inf')
+    epochs_no_improve = 0
+
+    os.makedirs("models", exist_ok=True)
+
+    for epoch in range(1, EPOCHS + 1):
+
+        # ── Train ──
         model.train()
-        train_loss = 0.0
-        train_correct = 0
+        train_loss, train_correct, train_total = 0.0, 0, 0
 
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
+        for imgs, labels in train_loader:
+            imgs, labels = imgs.to(device), labels.to(device)
 
             optimizer.zero_grad()
-
-            outputs = model(images)
+            outputs = model(imgs)
             loss = criterion(outputs, labels)
-
             loss.backward()
             optimizer.step()
 
-            train_loss += loss.item()
+            train_loss    += loss.item() * imgs.size(0)
+            _, predicted   = outputs.max(1)
+            train_correct += predicted.eq(labels).sum().item()
+            train_total   += imgs.size(0)
 
-            _, preds = torch.max(outputs, 1)
-            train_correct += (preds == labels).sum().item()
+        avg_train_loss = train_loss / train_total
+        train_acc = 100. * train_correct / train_total
 
+        # ── Validation ──
         model.eval()
-        val_loss = 0.0
-        val_correct = 0
+        val_loss, val_correct, val_total = 0.0, 0, 0
 
         with torch.no_grad():
-            for images, labels in val_loader:
-                images, labels = images.to(device), labels.to(device)
+            for imgs, labels in val_loader:
+                imgs, labels = imgs.to(device), labels.to(device)
+                outputs = model(imgs)
+                loss    = criterion(outputs, labels)
 
-                outputs = model(images)
-                loss = criterion(outputs, labels)
+                val_loss    += loss.item() * imgs.size(0)
+                _, predicted = outputs.max(1)
+                val_correct += predicted.eq(labels).sum().item()
+                val_total   += imgs.size(0)
 
-                val_loss += loss.item()
+        avg_val_loss = val_loss / val_total
+        val_acc = 100. * val_correct / val_total
 
-                _, preds = torch.max(outputs, 1)
-                val_correct += (preds == labels).sum().item()
-                
+        scheduler.step(avg_val_loss)
 
-        train_acc = train_correct / len(train_dataset)
-        val_acc = val_correct / len(val_dataset)
-        scheduler.step(val_loss)
+        print(f"Epoch [{epoch:2d}/{EPOCHS}] "
+              f"Train Loss: {avg_train_loss:.4f} Acc: {train_acc:.1f}% | "
+              f"Val Loss: {avg_val_loss:.4f} Acc: {val_acc:.1f}%")
 
-        print(f"\nEpoch {epoch+1}/{epochs}")
-        print(f"Train Loss: {train_loss/len(train_loader):.4f} | Acc: {train_acc:.4f}")
-        print(f"Val Loss: {val_loss/len(val_loader):.4f} | Acc: {val_acc:.4f}")
+        # ── Save best model ──
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            epochs_no_improve = 0
+            torch.save(model.state_dict(), SAVE_PATH)
+            print(f"  ✓ Best model saved (val loss: {best_val_loss:.4f})")
+        else:
+            epochs_no_improve += 1
+            print(f"  No improvement ({epochs_no_improve}/{PATIENCE})")
 
-    os.makedirs("models", exist_ok=True)
-    torch.save(model.state_dict(), "models/fire_smoke_classifier.pth")
+        # ── Early stopping ──
+        if epochs_no_improve >= PATIENCE:
+            print(f"\nEarly stopping — {PATIENCE} epoch բարելավում չկա։")
+            break
 
-if __name__ == '__main__':
-    train_model()
+    print(f"\nTraining ավարտ։ Best val loss: {best_val_loss:.4f}")
+    print(f"Model պահված: {SAVE_PATH}")
+
+
+if __name__ == "__main__":
+    train()

@@ -11,6 +11,7 @@ models/*.pth
 *.onnx
 
 classifier_data/
+val2017/
 data/
 *.zip
 *.tar.gz
