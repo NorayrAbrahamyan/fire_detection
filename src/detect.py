@@ -21,33 +21,24 @@ transform = transforms.Compose([
 
 
 def has_fire_or_smoke_colors(crop_bgr):
-    """
-    Ստուգում է արդյոք crop-ում կա fire կամ smoke գույն։
-    Fire  → նարնջագույն/կարմիր — HSV H: 0-35 կամ 160-180
-    Smoke → մոխրագույն — S<50, V=50-200
-    Կանաչ → եթե > 30% կանաչ pixel → background, skip
-    """
     hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
     h, w = crop_bgr.shape[:2]
     total = h * w
 
-    # Կանաչ exclusion — կանաչ թփեր, խոտ
     green_mask  = cv2.inRange(hsv, (35, 40, 40), (85, 255, 255))
     green_ratio = green_mask.sum() / 255 / total
     if green_ratio > 0.30:
         return False
 
-    # Fire — նարնջագույն/կարմիր/դեղին
     fire_mask1 = cv2.inRange(hsv, (0,   100, 100), (35,  255, 255))
     fire_mask2 = cv2.inRange(hsv, (160, 100, 100), (180, 255, 255))
     fire_mask  = cv2.bitwise_or(fire_mask1, fire_mask2)
     fire_ratio = fire_mask.sum() / 255 / total
 
-    # Smoke — մոխրագույն
     smoke_mask  = cv2.inRange(hsv, (0, 0, 50), (180, 50, 200))
     smoke_ratio = smoke_mask.sum() / 255 / total
 
-    return fire_ratio > 0.05 or smoke_ratio > 0.35
+    return fire_ratio > 0.05 or smoke_ratio > 0.50
 
 
 def load_ground_truth(label_path, img_w, img_h):
@@ -86,7 +77,6 @@ def detect_and_evaluate(image_path, label_path):
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     display = img.copy()
 
-    # GT boxes — կապույտով
     gt_data = load_ground_truth(label_path, w_img, h_img)
     print(f"Ground Truth boxes: {len(gt_data)}")
     for gt in gt_data:
@@ -106,7 +96,7 @@ def detect_and_evaluate(image_path, label_path):
     crops, boxes = [], []
     skipped_color = 0
 
-    for (x, y, w_box, h_box) in rects[:1000]:
+    for (x, y, w_box, h_box) in rects[:500]:
         if w_box < 100 or h_box < 100:
             continue
         if (w_box * h_box) > (w_img * h_img * 0.5):
@@ -123,20 +113,16 @@ def detect_and_evaluate(image_path, label_path):
         crops.append(transform(Image.fromarray(crop_rgb)))
         boxes.append([x, y, w_box, h_box])
 
-    print(f"Color filter-ով skip եղած: {skipped_color}")
-    print(f"Classifier-ին տրված proposals: {len(crops)}")
-
     if not crops:
-        print("Proposals չկան!")
+        print("No Proposals")
         cv2.imshow("Result", display)
         cv2.waitKey(0)
         return
 
-    # Batch inference
-    BATCH_SIZE = 64
+    batch_size = 64
     all_confs, all_preds = [], []
-    for i in range(0, len(crops), BATCH_SIZE):
-        batch = torch.stack(crops[i:i+BATCH_SIZE]).to(device)
+    for i in range(0, len(crops), batch_size):
+        batch = torch.stack(crops[i:i+batch_size]).to(device)
         with torch.no_grad():
             out = model(batch)
             probs = torch.softmax(out, dim=1)
@@ -153,34 +139,32 @@ def detect_and_evaluate(image_path, label_path):
                   f"max={conf_np[mask].max():.3f} "
                   f"mean={conf_np[mask].mean():.3f}")
 
-    CONF_THRESHOLD = 0.95
-    NMS_THRESHOLD  = 0.05
+    conf_threshold = 0.999
+    nms_threshold = 0.05
 
     # Per-class NMS
     kept_boxes = []
     for target_cls_id in [1, 2]:
         cls_boxes, cls_confs = [], []
         for i in range(len(all_preds)):
-            if all_preds[i] == target_cls_id and all_confs[i] > CONF_THRESHOLD:
+            if all_preds[i] == target_cls_id and all_confs[i] > conf_threshold:
                 cls_boxes.append(boxes[i])
                 cls_confs.append(float(all_confs[i]))
 
         if not cls_boxes:
             continue
 
-        nms_result = cv2.dnn.NMSBoxes(cls_boxes, cls_confs,
-                                       CONF_THRESHOLD, NMS_THRESHOLD)
+        nms_result = cv2.dnn.NMSBoxes(cls_boxes, cls_confs, conf_threshold, nms_threshold)
         if len(nms_result) > 0:
             for idx in nms_result.flatten():
                 kept_boxes.append({
-                    'box':    cls_boxes[idx],
-                    'conf':   cls_confs[idx],
+                    'box': cls_boxes[idx],
+                    'conf': cls_confs[idx],
                     'cls_id': target_cls_id
                 })
 
     print(f"Final detections after NMS: {len(kept_boxes)}")
 
-    # Draw
     for det in kept_boxes:
         x, y, w_b, h_b = det['box']
         pred_box    = [x, y, x + w_b, y + h_b]
@@ -204,9 +188,7 @@ def detect_and_evaluate(image_path, label_path):
             calculate_iou([d['box'][0], d['box'][1],
                            d['box'][0]+d['box'][2],
                            d['box'][1]+d['box'][3]],
-                          gt['box']) > 0.25
-            and (d['cls_id'] - 1) == gt['class']
-            for gt in gt_data
+                           gt['box']) > 0.25 and (d['cls_id'] - 1) == gt['class'] for gt in gt_data
         )
     )
     print(f"Correct: {correct}/{len(kept_boxes)} | "
@@ -217,7 +199,7 @@ def detect_and_evaluate(image_path, label_path):
 
 
 if __name__ == "__main__":
-    img_name = "fire42frame11_jpg.rf.cdf91ba7d4d3207461c268310829eb16"
-    img_path = f"data/valid/images/{img_name}.jpg"
-    lbl_path = f"data/valid/labels/{img_name}.txt"
+    img_name = "-189475_png.rf.b85d47a7ffdbb6a4f1e03160fb8cd426"
+    img_path = f"data/test/images/{img_name}.jpg"
+    lbl_path = f"data/test/labels/{img_name}.txt"
     detect_and_evaluate(img_path, lbl_path)

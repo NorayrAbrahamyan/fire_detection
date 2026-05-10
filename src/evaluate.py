@@ -20,9 +20,9 @@ transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-CONF_THRESHOLD = 0.95
-NMS_THRESHOLD  = 0.05
-IOU_THRESHOLD  = 0.15
+conf_threshold = 0.999
+nms_threshold = 0.05
+iou_threshold = 0.15
 
 
 def has_fire_or_smoke_colors(crop_bgr):
@@ -38,7 +38,7 @@ def has_fire_or_smoke_colors(crop_bgr):
     fire_ratio  = cv2.bitwise_or(fire_mask1, fire_mask2).sum() / 255 / total
     smoke_ratio = cv2.inRange(hsv, (0, 0, 50), (180, 50, 200)).sum() / 255 / total
 
-    return fire_ratio > 0.05 or smoke_ratio > 0.35
+    return fire_ratio > 0.05 or smoke_ratio > 0.50
 
 
 def load_ground_truth(label_path, img_w, img_h):
@@ -56,6 +56,7 @@ def load_ground_truth(label_path, img_w, img_h):
             x2 = int((xc + nw/2) * img_w)
             y2 = int((yc + nh/2) * img_h)
             gt_boxes.append({'box': [x1, y1, x2, y2], 'class': int(cls)})
+
     return gt_boxes
 
 
@@ -74,7 +75,7 @@ def detect_image(img_path, label_path):
     if img is None:
         return [], []
     h_img, w_img, _ = img.shape
-    rgb     = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     gt_data = load_ground_truth(str(label_path), w_img, h_img)
 
     ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
@@ -83,7 +84,7 @@ def detect_image(img_path, label_path):
     rects = ss.process()
 
     crops, boxes = [], []
-    for (x, y, w_box, h_box) in rects[:1000]:
+    for (x, y, w_box, h_box) in rects[:500]:
         if w_box < 100 or h_box < 100:
             continue
         if (w_box * h_box) > (w_img * h_img * 0.5):
@@ -110,18 +111,17 @@ def detect_image(img_path, label_path):
     for target_cls_id in [1, 2]:
         cls_boxes, cls_confs = [], []
         for i in range(len(all_preds)):
-            if all_preds[i] == target_cls_id and all_confs[i] > CONF_THRESHOLD:
+            if all_preds[i] == target_cls_id and all_confs[i] > conf_threshold:
                 cls_boxes.append(boxes[i])
                 cls_confs.append(float(all_confs[i]))
         if not cls_boxes:
             continue
-        nms_result = cv2.dnn.NMSBoxes(cls_boxes, cls_confs,
-                                       CONF_THRESHOLD, NMS_THRESHOLD)
+        nms_result = cv2.dnn.NMSBoxes(cls_boxes, cls_confs, conf_threshold, nms_threshold)
         if len(nms_result) > 0:
             for idx in nms_result.flatten():
                 detections.append({
-                    'box':    cls_boxes[idx],
-                    'conf':   cls_confs[idx],
+                    'box': cls_boxes[idx],
+                    'conf': cls_confs[idx],
                     'cls_id': target_cls_id
                 })
 
@@ -145,18 +145,15 @@ def evaluate(data_split="test", max_images=100):
         label_path = label_dir / img_path.name.replace(img_path.suffix, ".txt")
         gt_data, detections = detect_image(img_path, label_path)
 
-        # GT-ները per class
+        # GT-s per class
         gt_fire  = [g for g in gt_data if g['class'] == 0]
         gt_smoke = [g for g in gt_data if g['class'] == 1]
 
-        # Detection-ները per class
+        # Detections per class
         det_fire  = [d for d in detections if d['cls_id'] == 1]
         det_smoke = [d for d in detections if d['cls_id'] == 2]
 
-        for cls_name, gt_list, det_list in [
-            ('fire',  gt_fire,  det_fire),
-            ('smoke', gt_smoke, det_smoke)
-        ]:
+        for cls_name, gt_list, det_list in [('fire',  gt_fire,  det_fire),('smoke', gt_smoke, det_smoke)]:
             matched_gt = set()
             for det in det_list:
                 x, y, w, h = det['box']
@@ -171,19 +168,18 @@ def evaluate(data_split="test", max_images=100):
                         best_iou    = iou
                         best_gt_idx = gt_idx
 
-                if best_iou >= IOU_THRESHOLD and best_gt_idx >= 0:
+                if best_iou >= iou_threshold and best_gt_idx >= 0:
                     stats[cls_name]['tp'] += 1
                     matched_gt.add(best_gt_idx)
                 else:
                     stats[cls_name]['fp'] += 1
 
-            # False Negatives — GT-ներ որ չdетect-վեցին
             stats[cls_name]['fn'] += len(gt_list) - len(matched_gt)
 
         if (idx + 1) % 10 == 0:
             print(f"  {idx+1}/{len(img_files)} processed...")
 
-    # ── Results ──
+    #Results 
     print("\n" + "="*45)
     print(f"{'':10} {'Precision':>10} {'Recall':>10} {'F1':>10}")
     print("="*45)
@@ -194,9 +190,8 @@ def evaluate(data_split="test", max_images=100):
         fn = stats[cls_name]['fn']
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        recall    = tp / (tp + fn) if (tp + fn) > 0 else 0
-        f1        = (2 * precision * recall / (precision + recall)
-                     if (precision + recall) > 0 else 0)
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = (2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0)
 
         print(f"{cls_name:10} {precision:>10.3f} {recall:>10.3f} {f1:>10.3f}")
         print(f"{'':10} TP={tp} FP={fp} FN={fn}")
@@ -208,9 +203,8 @@ def evaluate(data_split="test", max_images=100):
     total_fp = sum(stats[c]['fp'] for c in stats)
     total_fn = sum(stats[c]['fn'] for c in stats)
     precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
-    recall    = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
-    f1        = (2 * precision * recall / (precision + recall)
-                 if (precision + recall) > 0 else 0)
+    recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
+    f1 = (2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0)
     print(f"{'OVERALL':10} {precision:>10.3f} {recall:>10.3f} {f1:>10.3f}")
     print("="*45)
 

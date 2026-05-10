@@ -6,9 +6,6 @@ from pathlib import Path
 
 
 def get_gt_boxes(label_path, img_w, img_h):
-    """
-    YOLO label file-ից կարդում է GT boxes-ները pixel coordinates-ով
-    """
     boxes = []
     if not label_path.exists():
         return boxes
@@ -30,13 +27,9 @@ def get_gt_boxes(label_path, img_w, img_h):
 
 
 def get_fire_smoke_crops(data_split, limit_per_class):
-    """
-    YOLO dataset-ից վերցնում է fire և smoke crop-երը։
-    GT box-երից ուղղակի crop անում ենք։
-    """
-    img_dir   = Path(f"data/{data_split}/images")
+    img_dir = Path(f"data/{data_split}/images")
     label_dir = Path(f"data/{data_split}/labels")
-    out_dir   = Path(f"classifier_data/{data_split}")
+    out_dir = Path(f"classifier_data/{data_split}")
 
     counts = {'fire': 0, 'smoke': 0}
 
@@ -84,16 +77,8 @@ def get_fire_smoke_crops(data_split, limit_per_class):
 
 
 def get_background_crops_from_coco(coco_dir, data_split, limit):
-    """
-    COCO val2017-ից վերցնում է background crop-երը։
-    COCO-ում fire/smoke բացարձակ չկա → 100% clean background։
-    """
-    out_dir     = Path(f"classifier_data/{data_split}/background")
+    out_dir = Path(f"classifier_data/{data_split}/background")
     coco_images = list(Path(coco_dir).glob("*.jpg"))
-
-    if not coco_images:
-        print(f"  COCO images չկան {coco_dir} folder-ում!")
-        return 0
 
     random.shuffle(coco_images)
 
@@ -102,7 +87,7 @@ def get_background_crops_from_coco(coco_dir, data_split, limit):
         if count >= limit:
             break
 
-        img = cv2.imread(str(img_path))
+        img = cv2.imread(str(img_path)) 
         if img is None:
             continue
         h, w, _ = img.shape
@@ -110,12 +95,10 @@ def get_background_crops_from_coco(coco_dir, data_split, limit):
         if h < 100 or w < 100:
             continue
 
-        # Յուրաքանչյուր COCO նկարից 2 random crop
         for j in range(2):
             if count >= limit:
                 break
 
-            # Random crop — նկարի 30-70%-ը
             crop_h = random.randint(int(h * 0.3), int(h * 0.7))
             crop_w = random.randint(int(w * 0.3), int(w * 0.7))
             y1 = random.randint(0, h - crop_h)
@@ -131,43 +114,29 @@ def get_background_crops_from_coco(coco_dir, data_split, limit):
 
     return count
 
-
 def prepare(data_split, fire_smoke_limit, bg_limit, coco_dir):
-    print(f"\n── {data_split.upper()} ──")
+    print(f"\n{data_split.upper()}")
 
     for cls in ['fire', 'smoke', 'background']:
         os.makedirs(f"classifier_data/{data_split}/{cls}", exist_ok=True)
 
-    # Fire / Smoke — YOLO dataset-ից
-    print("Fire/Smoke crops YOLO-ից...")
+    #Fire/Smoke from YOLO
     counts = get_fire_smoke_crops(data_split, fire_smoke_limit)
     print(f"  Fire:  {counts['fire']}")
     print(f"  Smoke: {counts['smoke']}")
 
-    # Background — COCO-ից
+    #Background from COCO
     print("Background crops COCO-ից...")
     bg_count = get_background_crops_from_coco(coco_dir, data_split, bg_limit)
     print(f"  Background: {bg_count}")
 
 
 if __name__ == "__main__":
-    COCO_DIR = "val2017"
+    coco_dir = "val2017"
 
-    # Մաքրել հին data-ն
     if os.path.exists("classifier_data"):
         shutil.rmtree("classifier_data")
-        print("Հին classifier_data մաքրվեց։")
+        print("Old classifier_data cleaned")
 
-    prepare(
-        data_split="train",
-        fire_smoke_limit=5000,
-        bg_limit=5000,
-        coco_dir=COCO_DIR
-    )
-
-    prepare(
-        data_split="valid",
-        fire_smoke_limit=1000,
-        bg_limit=1000,
-        coco_dir=COCO_DIR
-    )
+    prepare(data_split="train", fire_smoke_limit=5000, bg_limit=5000, coco_dir=coco_dir)
+    prepare(data_split="valid", fire_smoke_limit=1000, bg_limit=1000, coco_dir=coco_dir)
