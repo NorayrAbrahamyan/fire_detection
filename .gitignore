@@ -20,3 +20,6 @@ data/
 .DS_Store?
 ._*
 Thumbs.db
+src/test/
+result_output.jpg
+detected_errors/

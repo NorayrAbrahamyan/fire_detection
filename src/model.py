@@ -10,15 +10,16 @@ def fire_smoke_classifier(num_classes=3):
 
     for param in model.layer3.parameters():
         param.requires_grad = True
-
     for param in model.layer4.parameters():
         param.requires_grad = True
 
     num_features = model.fc.in_features
+    
     model.fc = nn.Sequential(
         nn.Linear(num_features, 256),
+        nn.BatchNorm1d(256), 
         nn.ReLU(),
-        nn.Dropout(p=0.4),
+        nn.Dropout(p=0.4), 
         nn.Linear(256, num_classes)
     )
 
