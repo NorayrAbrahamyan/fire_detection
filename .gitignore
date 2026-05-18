@@ -1,25 +1,12 @@
 __pycache__/
-*.py[cod]
-*$py.class
-.venv/
 venv/
-ENV/
-env/
+.DS_Store
 
-models/*.pth
-*.weights
-*.onnx
-
+models/
 classifier_data/
 val2017/
 data/
-*.zip
-*.tar.gz
 
-.DS_Store
-.DS_Store?
-._*
-Thumbs.db
 src/test/
 result_output.jpg
 detected_errors/
