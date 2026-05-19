@@ -6,31 +6,30 @@ from torchvision import transforms, models
 from PIL import Image
 import os
 
-# --- DEVICE ---
+#DEVICE
 device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
 classes = ['background', 'fire', 'smoke']
 
-# --- MODEL DEFINITION (Պետք է համընկնի train.py-ի հետ) ---
+#MODEL DEFINITION
 def get_model(num_classes):
     model = models.resnet18(weights=None)
     num_ftrs = model.fc.in_features
-    # Ճիշտ նույն կառուցվածքը, ինչ օգտագործվել է մարզման ժամանակ
     model.fc = nn.Sequential(
         nn.Dropout(p=0.5), 
         nn.Linear(num_ftrs, num_classes)
     )
     return model
 
-# --- MODEL SETUP ---
+#MODEL SETUP
 model = get_model(len(classes))
 model_path = "models/best_model.pth"
 
 if os.path.exists(model_path):
     state_dict = torch.load(model_path, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)
-    print(f"✅ Model loaded successfully from {model_path}")
+    print(f"Model loaded successfully from {model_path}")
 else:
-    print(f"❌ ERROR: Model not found at {model_path}")
+    print(f"ERROR: Model not found at {model_path}")
 
 model.to(device).eval()
 
@@ -126,7 +125,7 @@ def detect_and_evaluate(image_path, label_path):
         all_confs.extend(confs.cpu().numpy())
         all_preds.extend(preds.cpu().numpy())
 
-    fire_thresh, smoke_thresh = 0.90, 0.98
+    fire_thresh, smoke_thresh = 0.95, 0.98
     kept_boxes = []
     
     for target_cls_id in [1, 2]:
@@ -169,7 +168,7 @@ def detect_and_evaluate(image_path, label_path):
     cv2.waitKey(0)
 
 if __name__ == "__main__":
-    img_name = "WEBFire1709_jpg.rf.3d2a0ae2bca55e9761ef100afe853495"
+    img_name = "new_fire_fire-577_png_jpg.rf.f6f3b878db2943eb9e4288a6623dcb99"
     img_path = f"data/test/images/{img_name}.jpg"
     lbl_path = f"data/test/labels/{img_name}.txt"
     detect_and_evaluate(img_path, lbl_path)

@@ -6,14 +6,22 @@ from torchvision import transforms, models
 from PIL import Image
 import os
 import sys
+from pathlib import Path
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+# --- DEVICE CONFIGURATION ---
+device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
 classes = ['background', 'fire', 'smoke']
 
-CONF_THRESHOLD_FIRE = 0.85   
-CONF_THRESHOLD_SMOKE = 0.85
+# --- TUNING PARAMETERS ---
+CONF_THRESHOLD_FIRE = 0.90  
+CONF_THRESHOLD_SMOKE = 0.95
 NMS_THRESHOLD = 0.01         
 
+# --- OUTPUT DIRECTORY ---
+OUTPUT_DIR = Path("predictions")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+# --- MODEL DEFINITION ---
 def get_model(num_classes):
     model = models.resnet18(weights=None)
     num_ftrs = model.fc.in_features
@@ -23,15 +31,16 @@ def get_model(num_classes):
     )
     return model
 
+# --- MODEL SETUP ---
 model = get_model(len(classes))
 model_path = "models/best_model.pth"
 
 if os.path.exists(model_path):
-    print(f"✅ Loading weights from {model_path}...")
+    print(f"Loading weights from {model_path}...")
     state_dict = torch.load(model_path, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=True)
 else:
-    print(f"❌ ERROR: Model file not found at {model_path}")
+    print(f"ERROR: Model file not found at {model_path}")
     sys.exit(1)
 
 model.to(device).eval()
@@ -42,20 +51,21 @@ transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-def run_inference(image_path, output_path="result.jpg"):
+# --- INFERENCE FUNCTION ---
+def run_inference(image_path):
     img = cv2.imread(image_path)
     if img is None: 
-        print(f"❌ Նկարը չգտնվեց: {image_path}")
+        print(f"Նկարը չգտնվեց: {image_path}")
         return
     
     img = cv2.resize(img, (640, 480))
     
-    print(f"🕒 Processing image: {image_path}...")
+    print(f"Processing image: {image_path}...")
     h_img, w_img, _ = img.shape
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     display = img.copy()
 
-    # 1. Selective Search
+    #Selective Search
     ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
     ss.setBaseImage(img)
     ss.switchToSelectiveSearchFast()
@@ -67,12 +77,15 @@ def run_inference(image_path, output_path="result.jpg"):
         crops.append(transform(Image.fromarray(rgb[y:y+h_box, x:x+w_box])))
         boxes.append([x, y, w_box, h_box])
 
+    img_name = Path(image_path).name
+    output_path = OUTPUT_DIR / f"pred_{img_name}"
+
     if not crops:
-        print("ℹ️ No proposals to classify.")
-        cv2.imwrite(output_path, display)
+        print("No proposals to classify.")
+        cv2.imwrite(str(output_path), display)
         return
 
-    # 2. Batch Inference
+    #Batch Inference
     all_confs, all_preds = [], []
     batch_size = 64
     for i in range(0, len(crops), batch_size):
@@ -84,7 +97,7 @@ def run_inference(image_path, output_path="result.jpg"):
         all_confs.extend(confs.cpu().numpy())
         all_preds.extend(preds.cpu().numpy())
 
-    # 3. Post-Processing (Threshold & NMS)
+    #Post-Processing (Threshold & NMS)
     detections = []
     for target_cls_id in [1, 2]:
         current_thresh = CONF_THRESHOLD_FIRE if target_cls_id == 1 else CONF_THRESHOLD_SMOKE
@@ -106,11 +119,11 @@ def run_inference(image_path, output_path="result.jpg"):
                     'cls_name': classes[target_cls_id]
                 })
 
-    # 4. Drawing Results
+    #Drawing Results
     if not detections:
-        print("ℹ️ Nothing detected.")
+        print("Nothing detected.")
     else:
-        print(f"🔥 Found {len(detections)} objects.")
+        print(f"Found {len(detections)} objects.")
 
     for det in detections:
         x, y, w, h = det['box']
@@ -119,12 +132,12 @@ def run_inference(image_path, output_path="result.jpg"):
         label = f"{det['cls_name']}: {det['conf']:.2f}"
         cv2.putText(display, label, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-    # 5. Save Result
-    cv2.imwrite(output_path, display)
-    print(f"💾 Result saved to: {output_path}")
+    #Save Result
+    cv2.imwrite(str(output_path), display)
+    print(f"Result saved to: {output_path}")
 
+# --- RUNNING ---
 if __name__ == "__main__":
-    my_image = "src/test/pexels-yavuz-solgun-26647055-28536734-scaled.jpg" 
-    output_image = "result_output.jpg" 
+    my_image = "src/test/3b58077b35a067c9b3e7c26896f66395.jpg" 
     
-    run_inference(my_image, output_image)
+    run_inference(my_image)

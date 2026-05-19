@@ -33,11 +33,11 @@ model = get_model(3)
 model_path = "models/best_model.pth"
 
 if os.path.exists(model_path):
-    print(f"✅ Loading weights from {model_path}...")
+    print(f"Loading weights from {model_path}...")
     state_dict = torch.load(model_path, map_location=device, weights_only=True)
     model.load_state_dict(state_dict, strict=True)
 else:
-    print("❌ ERROR: Model file not found!")
+    print(" ERROR: Model file not found!")
 
 model.to(device).eval()
 
@@ -126,7 +126,7 @@ def evaluate(data_split="test", max_images=40):
     label_dir = Path(f"data/{data_split}/labels")
     img_files = (list(img_dir.glob("*.jpg")) + list(img_dir.glob("*.png")))[:max_images]
 
-    print(f"\n🔍 Evaluating {len(img_files)} images from {data_split} set...")
+    print(f"\nEvaluating {len(img_files)} images from {data_split} set...")
     stats = {'fire': {'tp': 0, 'fp': 0, 'fn': 0}, 'smoke': {'tp': 0, 'fp': 0, 'fn': 0}}
 
     for idx, img_path in enumerate(img_files):
@@ -175,4 +175,4 @@ def evaluate(data_split="test", max_images=40):
     print("="*50)
 
 if __name__ == "__main__":
-    evaluate(data_split="test", max_images=40)
+    evaluate(data_split="test", max_images=100)

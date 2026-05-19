@@ -30,7 +30,6 @@ val_ds = datasets.ImageFolder('classifier_data/valid', transform=val_transform)
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_ds, batch_size=32, shuffle=False)
 
-# 4. Մոդելի սահմանում (ResNet18 + Dropout)
 def get_model(num_classes):
     model = models.resnet18(weights='IMAGENET1K_V1')
     for param in model.parameters():
@@ -56,7 +55,7 @@ optimizer = optim.Adam(model.parameters(), lr=1e-5) # Փոքր LR, որ հանգ
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
 # 6. Training Loop
-def train_model(epochs=2):
+def train_model(epochs=3):
     best_val_loss = float('inf')
     
     for epoch in range(epochs):
