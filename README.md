@@ -1,4 +1,4 @@
-# 🔥 Automated Two-Stage Environmental Wildfire & Plume Smoke Detection System
+# 🔥 Automated Two-Stage Environmental Fire & Smoke Detection System
 
 ## Overview & Abstract
 This repository contains a production-grade, end-to-end computer vision and deep learning framework engineered for the autonomous, real-time spatial localization and multi-class classification of environmental hazards—specifically open-terrain wildfires, structural brush fires, and particulate smoke plumes—from static or continuous surveillance camera matrices.
