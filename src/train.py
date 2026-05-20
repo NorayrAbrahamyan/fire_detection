@@ -5,7 +5,7 @@ from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 import os
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 train_transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -23,7 +23,7 @@ val_transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-# 3. Data Loaders
+#Data Loaders
 train_ds = datasets.ImageFolder('classifier_data/train', transform=train_transform)
 val_ds = datasets.ImageFolder('classifier_data/valid', transform=val_transform)
 
@@ -51,10 +51,10 @@ model = get_model(len(train_ds.classes)).to(device)
 weights = torch.tensor([1.0, 3.0, 3.0], dtype=torch.float).to(device)
 criterion = nn.CrossEntropyLoss(weight=weights, label_smoothing=0.1)
 
-optimizer = optim.Adam(model.parameters(), lr=1e-5) # Փոքր LR, որ հանգիստ սովորի
+optimizer = optim.Adam(model.parameters(), lr=1e-5)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
-# 6. Training Loop
+#Training Loop
 def train_model(epochs=3):
     best_val_loss = float('inf')
     
@@ -73,7 +73,7 @@ def train_model(epochs=3):
             
             running_loss += loss.item()
         
-        # Validation
+        #Validation
         model.eval()
         val_loss = 0.0
         correct = 0
@@ -95,7 +95,7 @@ def train_model(epochs=3):
         
         scheduler.step()
 
-        # Save best model
+        #Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), "models/best_model.pth")

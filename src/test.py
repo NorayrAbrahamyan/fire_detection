@@ -8,20 +8,20 @@ import os
 import sys
 from pathlib import Path
 
-# --- DEVICE CONFIGURATION ---
-device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+#Device configuration
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 classes = ['background', 'fire', 'smoke']
 
-# --- TUNING PARAMETERS ---
-CONF_THRESHOLD_FIRE = 0.90  
+#Tuning parameters
+CONF_THRESHOLD_FIRE = 0.93
 CONF_THRESHOLD_SMOKE = 0.95
 NMS_THRESHOLD = 0.01         
 
-# --- OUTPUT DIRECTORY ---
+#Output directory
 OUTPUT_DIR = Path("predictions")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# --- MODEL DEFINITION ---
+#Model definition
 def get_model(num_classes):
     model = models.resnet18(weights=None)
     num_ftrs = model.fc.in_features
@@ -31,7 +31,7 @@ def get_model(num_classes):
     )
     return model
 
-# --- MODEL SETUP ---
+#Model setup
 model = get_model(len(classes))
 model_path = "models/best_model.pth"
 
@@ -51,7 +51,6 @@ transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-# --- INFERENCE FUNCTION ---
 def run_inference(image_path):
     img = cv2.imread(image_path)
     if img is None: 
@@ -97,7 +96,7 @@ def run_inference(image_path):
         all_confs.extend(confs.cpu().numpy())
         all_preds.extend(preds.cpu().numpy())
 
-    #Post-Processing (Threshold & NMS)
+    #Post-Processing
     detections = []
     for target_cls_id in [1, 2]:
         current_thresh = CONF_THRESHOLD_FIRE if target_cls_id == 1 else CONF_THRESHOLD_SMOKE
@@ -136,8 +135,7 @@ def run_inference(image_path):
     cv2.imwrite(str(output_path), display)
     print(f"Result saved to: {output_path}")
 
-# --- RUNNING ---
 if __name__ == "__main__":
-    my_image = "src/test/3b58077b35a067c9b3e7c26896f66395.jpg" 
+    my_image = "src/test/041726a8d14f7c5a904b5188a775dd7ee0e290.webp" 
     
     run_inference(my_image)

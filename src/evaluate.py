@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import shutil
 
-device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 CONF_THRESHOLD_FIRE = 0.95 
 CONF_THRESHOLD_SMOKE = 0.97

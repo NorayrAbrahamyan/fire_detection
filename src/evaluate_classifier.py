@@ -7,11 +7,11 @@ from PIL import Image
 import os
 from pathlib import Path
 
-#DEVICE CONFIGURATION 
+#Device configuration
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 classes = ['background', 'fire', 'smoke']
 
-#MODEL DEFINITION
+#Model definition
 def get_model(num_classes):
     model = models.resnet18(weights=None)
     num_ftrs = model.fc.in_features
@@ -21,7 +21,7 @@ def get_model(num_classes):
     )
     return model
 
-#MODEL INITIALIZATION 
+#Model initialization
 model = get_model(3) 
 model_path = "models/best_model.pth"
 
@@ -41,7 +41,7 @@ transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-#EVALUATION FUNCTION
+#Evaluation function
 def evaluate_pure_classifier(data_split="test", max_images=200):
     img_dir = Path(f"data/{data_split}/images")
     label_dir = Path(f"data/{data_split}/labels")

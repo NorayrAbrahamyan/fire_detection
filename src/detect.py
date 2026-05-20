@@ -6,11 +6,11 @@ from torchvision import transforms, models
 from PIL import Image
 import os
 
-#DEVICE
-device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+#Device
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 classes = ['background', 'fire', 'smoke']
 
-#MODEL DEFINITION
+#Model definition
 def get_model(num_classes):
     model = models.resnet18(weights=None)
     num_ftrs = model.fc.in_features
@@ -20,7 +20,7 @@ def get_model(num_classes):
     )
     return model
 
-#MODEL SETUP
+#Model setup
 model = get_model(len(classes))
 model_path = "models/best_model.pth"
 
@@ -39,8 +39,6 @@ transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-# --- UTILS ---
-
 def has_fire_or_smoke_colors(crop_bgr):
     hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
     h, w = crop_bgr.shape[:2]
@@ -51,7 +49,7 @@ def has_fire_or_smoke_colors(crop_bgr):
     green_mask = cv2.inRange(hsv, lower_green, upper_green)
     green_ratio = np.sum(green_mask > 0) / total_pixels
 
-    if green_ratio > 0.60: # Եթե 60%-ից ավելին կանաչ է, սա կրակ չէ
+    if green_ratio > 0.60:
         return False
     return True 
 
@@ -79,7 +77,7 @@ def calculate_iou(boxA, boxB):
     union = float(boxAArea + boxBArea - interArea)
     return interArea / union if union > 0 else 0
 
-# --- MAIN DETECTION ---
+#Main detection
 
 def detect_and_evaluate(image_path, label_path):
     img = cv2.imread(image_path)
@@ -138,7 +136,6 @@ def detect_and_evaluate(image_path, label_path):
         
         if not cls_boxes: continue
         
-        # Խստացում 4: Շատ խիստ NMS (0.1 -> 0.01)
         indices = cv2.dnn.NMSBoxes(cls_boxes, cls_confs, current_thresh, 0.01)
         if len(indices) > 0:
             for idx in indices.flatten():
@@ -156,7 +153,7 @@ def detect_and_evaluate(image_path, label_path):
         
         is_tp = any(calculate_iou(pred_box, gt['box']) > 0.15 and yolo_cls_id == gt['class'] for gt in gt_data)
         
-        color = (0, 255, 0) if is_tp else (0, 0, 255) # Կանաչ եթե TP է, Կարմիր եթե FP
+        color = (0, 255, 0) if is_tp else (0, 0, 255) 
         if is_tp: correct_count += 1
 
         cv2.rectangle(display, (x, y), (x+w, y+h), color, 2)
