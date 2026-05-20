@@ -1,8 +1,0 @@
-.gitignore
-data/
-classifier_data/
-val2017/
-__pycache__/
-.DS_Store
-detected_errors/
-test/
