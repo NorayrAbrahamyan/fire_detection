@@ -136,6 +136,6 @@ def run_inference(image_path):
     print(f"Result saved to: {output_path}")
 
 if __name__ == "__main__":
-    my_image = "src/test/041726a8d14f7c5a904b5188a775dd7ee0e290.webp" 
+    my_image = "src/test/free-photo-of-high-rise-fire-incident-in-dubai-building.jpeg" 
     
     run_inference(my_image)

@@ -115,4 +115,4 @@ if __name__ == "__main__":
         print("No existing model found. Training from ImageNet weights.")
 
     print("Starting training...")
-    train_model(epochs=5)
+    train_model(epochs=2)
