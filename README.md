@@ -1,6 +1,6 @@
-# 🔥 Automated Two-Stage Environmental Wildfire & Plume Smoke Detection System Using Deep Residual Networks
+# 🔥 Automated Two-Stage Environmental Wildfire & Plume Smoke Detection System
 
-## Executive Overview & Abstract
+## Overview & Abstract
 This repository contains a production-grade, end-to-end computer vision and deep learning framework engineered for the autonomous, real-time spatial localization and multi-class classification of environmental hazards—specifically open-terrain wildfires, structural brush fires, and particulate smoke plumes—from static or continuous surveillance camera matrices.
 
 In contrast to computationally expensive, brute-force localized scanning pipelines, this project architects a highly optimized **Two-Stage Object Detection Paradigm**. The framework decouples the processing overhead into two specialized operational stages:
@@ -11,7 +11,7 @@ By separating localization from classification and providing dedicated benchmark
 
 ---
 
-## Exhaustive Project Architecture & File System Mapping
+## Project Architecture & File System Mapping
 
 The codebase layout is strictly organized according to professional software engineering and machine learning deployment standards. Below is the full directory tree corresponding exactly to the validated directory structures of the local project workspace:
 
