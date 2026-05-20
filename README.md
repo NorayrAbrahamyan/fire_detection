@@ -51,4 +51,4 @@ fire_detection/
 │   └── prepare_data.py            # Preprocessing script executing data splitting and automated patch cropping
 ├── requirements.txt               # Locked third-party Python package environment dependency manifest
 ├── .gitignore                     # Exclusion rules preventing heavy datasets/caches from pushing to version control
-└── README.md                      # Comprehensive academic, operational, and software-level documentation
+└── README.md                      # Documentation
