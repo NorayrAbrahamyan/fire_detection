@@ -1,12 +1,11 @@
 import torch
-import torch.nn as nn
 import cv2
-import numpy as np
-from torchvision import transforms, models
+from torchvision import transforms
 from PIL import Image
 import os
 from pathlib import Path
 import shutil
+from model import fire_smoke_classifier
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -20,16 +19,7 @@ if FP_SAVE_DIR.exists():
     shutil.rmtree(FP_SAVE_DIR)
 FP_SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
-def get_model(num_classes):
-    model = models.resnet18(weights=None)
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Sequential(
-        nn.Dropout(p=0.5), 
-        nn.Linear(num_ftrs, num_classes)
-    )
-    return model
-
-model = get_model(3) 
+model = fire_smoke_classifier(3) 
 model_path = "models/best_model.pth"
 
 if os.path.exists(model_path):

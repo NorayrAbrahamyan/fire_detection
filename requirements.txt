@@ -1,5 +1,4 @@
 torch
 torchvision
 opencv-contrib-python
-numpy
 Pillow

@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms, models
+from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import os
+from model import fire_smoke_classifier
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -30,23 +31,7 @@ val_ds = datasets.ImageFolder('classifier_data/valid', transform=val_transform)
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_ds, batch_size=32, shuffle=False)
 
-def get_model(num_classes):
-    model = models.resnet18(weights='IMAGENET1K_V1')
-    for param in model.parameters():
-        param.requires_grad = False
-
-    for param in model.layer4.parameters():
-        param.requires_grad = True
-
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Sequential(
-        nn.Dropout(p=0.5),
-        nn.Linear(num_ftrs, num_classes)
-    )
-    return model
-
-model = get_model(len(train_ds.classes)).to(device)
-
+model = fire_smoke_classifier(len(train_ds.classes)).to(device)
 
 weights = torch.tensor([1.0, 3.0, 3.0], dtype=torch.float).to(device)
 criterion = nn.CrossEntropyLoss(weight=weights, label_smoothing=0.1)

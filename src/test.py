@@ -1,12 +1,12 @@
 import torch
-import torch.nn as nn
 import cv2
 import numpy as np
-from torchvision import transforms, models
+from torchvision import transforms
 from PIL import Image
 import os
 import sys
 from pathlib import Path
+from model import fire_smoke_classifier
 
 #Device configuration
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -22,17 +22,7 @@ OUTPUT_DIR = Path("predictions")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 #Model definition
-def get_model(num_classes):
-    model = models.resnet18(weights=None)
-    num_ftrs = model.fc.in_features
-    model.fc = nn.Sequential(
-        nn.Dropout(p=0.5), 
-        nn.Linear(num_ftrs, num_classes)
-    )
-    return model
-
-#Model setup
-model = get_model(len(classes))
+model = fire_smoke_classifier(len(classes))
 model_path = "models/best_model.pth"
 
 if os.path.exists(model_path):
